@@ -47,6 +47,7 @@
     <mkdir dir="${path.bin.main}"/>
     <mkdir dir="${path.bin.test}"/>
     <mkdir dir="${path.lib}"/>
+    <mkdir dir="${path.matches}"/>
   </target>
 
   <target name="clean" description="Clean up temporary directories.">
@@ -69,8 +70,6 @@
   </target>
 
   <target name="update" depends="init" description="Update to the latest version of the battlecode software.">
-    <!-- These URLs will get less horrible when we release. -->
-
     <!-- Read the latest battlecode version from the web site. -->
     <get src="https://www.battlecode.org/contestants/latest/"
       dest="${java.io.tmpdir}/battlecode-version"/>
@@ -81,9 +80,7 @@
     </loadfile>
 
     <!-- Manually update ivy.xml, setting the battlecode versions to ${bc.version}. 
-         Yes, it's horrible.
-         This is necessary because of limitations in the battlecode package repository;
-         it will be cleaner next year. -->
+         Yes, it's horrible. -->
     <replaceregexp file="ivy.xml" flags="g">
       <regexp pattern="name=&quot;battlecode(-javadoc|-mapeditor)?&quot;(\s+)rev=&quot;[^&quot;]+&quot;"/>
       <substitution expression="name=&quot;battlecode\1&quot;\2rev=&quot;${bc.version}&quot;"/>
@@ -135,24 +132,47 @@
     </javac>
   </target>
 
-  <target name="run" depends="build" description="Run the battlecode client.">
-    <!-- Call into battlecode.client to run things. -->
-    <java classpathref="classpath.run" fork="yes" classname="battlecode.client.Main">
-      <jvmarg value="-Dapple.awt.graphics.UseQuartz=true"/>
-      <jvmarg value="-Dsun.java2d.opengl=true"/>
-      <arg line="-c bc.conf" unless:set="bc.conf"/>
-      <arg line="-c ${bc.conf}" if:set="bc.conf"/>
-    </java>
-  </target>
   
-  <target name="headless" depends="build" description="Run the battlecode server without starting the client. Pass -Dbc.conf=[FILE] to supply your own configuration file.">
+  <target name="run" depends="build" description="Run a match. ">
+    <condition property="missingparameters">
+      <not><and>
+          <isset property="team-a"/>
+          <isset property="team-a"/>
+          <isset property="team-a"/>
+      </and></not>
+    </condition>
+    <fail if:set="missingparameters">
+      Run as "ant run -Dteam-a=examplefuncsplayer -Dteam-b=bananas -Dmaps=simple,shrine"
+      Don't put spaces in between the maps.
+      Or just use the client.
+    </fail>
+
+    <!-- Get the current time. -->
+    <tstamp>
+      <format property="timestamp" pattern="dd-mm-YY-kkmmss"/>
+    </tstamp>
+
     <!-- Call into battlecode.server to run things. -->
     <java classpathref="classpath.run" fork="yes" classname="battlecode.server.Main">
+      <!-- Maps to run -->
+      <jvmarg value="-Dbc.game.maps=${maps}"/>
+      <!-- Team A -->
+      <jvmarg value="-Dbc.game.team-a=${team-a}"/>
+      <!-- Team B -->
+      <jvmarg value="-Dbc.game.team-b=${team-b}"/>
+      <!-- Where to find extra maps -->
+      <jvmarg value="-Dbc.server.map-path=maps"/>
+      <!-- Are debug methods enabled? -->
+      <jvmarg value="-Dbc.engine.debug-methods=true"/>
+      <!-- Run a single match (called "headless" for legacy reasons) -->
       <jvmarg value="-Dbc.server.mode=headless"/>
-      <arg line="-c bc.conf" unless:set="bc.conf"/>
-      <arg line="-c ${bc.conf}" if:set="bc.conf"/>
+      <!-- Save file format. -->
+      <jvmarg value="-Dbc.server.save-file=${path.matches}/${team-a}-vs-${team-b}-on-${maps}-${timestamp}.bc17"/>
+      <arg value="-c=-"/>
     </java>
   </target>
+
+  <target name="headless" depends="run"></target>
 
   <target name="test" depends="build-tests" description="Run tests.">
     <!-- Run JUnit for tests. -->
@@ -186,10 +206,6 @@
     <echo message="${team}-submission.jar already exists, deleting" if:set="team.jar.exists"/>
     <delete file="${team}-submission.jar" if:set="team.jar.exists"/>
     <jar destfile="${team}-submission.jar" basedir="${path.src}" includes="${team}/**/*.java,${team}/**/*.scala"/>
-  </target>
-
-  <target name="mapeditor" description="Run the map editor.">
-    <java classpathref="classpath.run" fork="yes" classname="battlecode.mapeditor.st3"/>
   </target>
 
   <target name="print-version" description="Print the current battlecode version">

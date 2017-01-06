@@ -13,6 +13,8 @@ hs_err_pid*
 lib/
 bin/
 
+matches/
+
 # unneeded eclipse info
 .metadata/
 
